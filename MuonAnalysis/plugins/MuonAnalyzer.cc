@@ -150,7 +150,6 @@ void MuonAnalyzer::analyze(const edm::Event &iEvent, const edm::EventSetup &iSet
       branches_["gen_pdgId"].push_back(gen.pdgId());
 
       genIdxToOutIdxMap[idx] = jdx;
-      std::cout << "gen " << idx << " pos " << jdx << std::endl;
 
       idx++;
       jdx++;
