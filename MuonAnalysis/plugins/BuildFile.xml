@@ -8,4 +8,7 @@
 <use name="CommonTools/UtilAlgos"/>
 <use name="PhysicsTools/Utilities"/>
 <use name="PhysicsTools/PatAlgos"/>
+<use name="RecoMuon/TrackingTools"/>
+<use name="RecoMuon/GlobalTrackingTools"/>
+<use name="TrackingTools/PatternTools"/>
 </library>

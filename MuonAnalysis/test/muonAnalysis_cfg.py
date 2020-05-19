@@ -27,6 +27,14 @@ process.load('Configuration.Geometry.GeometryExtended2026D49Reco_cff')
 process.load('Configuration.StandardSequences.MagneticField_cff')
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 
+# needed for reco stuff
+process.load('Configuration.Geometry.GeometryExtended2026D49Reco_cff')
+process.load('Configuration.StandardSequences.MagneticField_cff')
+process.load('Configuration.StandardSequences.RawToDigi_cff')
+process.load('Configuration.StandardSequences.L1Reco_cff')
+process.load('Configuration.StandardSequences.Reconstruction_cff')
+process.load('Configuration.StandardSequences.RecoSim_cff')
+
 from Configuration.AlCa.GlobalTag import GlobalTag
 process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:phase2_realistic_T15', '')
 
@@ -53,11 +61,22 @@ process.options = cms.untracked.PSet(
 
 process.schedule = cms.Schedule()
 
+from RecoMuon.TrackingTools.MuonServiceProxy_cff import *
+from RecoMuon.GlobalTrackingTools.GlobalMuonTrackMatcher_cff import *
+
 process.muonAnalyzer = cms.EDAnalyzer('MuonAnalyzer',
+    MuonServiceProxy,
+    GlobalMuonTrackMatcher,
     muonsSrc = cms.InputTag('muons'),
     genSrc = cms.InputTag('genParticles'),
     verticesSrc = cms.InputTag('offlinePrimaryVertices4D'),
     pfSrc = cms.InputTag('particleFlow'),
+    trackSrc = cms.InputTag('trackExtenderWithMTD'),
+    standAloneSrc = cms.InputTag('standAloneMuons','UpdatedAtVtx'),
+    globalSrc = cms.InputTag('globalMuons'),
+    trackMCMatch = cms.InputTag('innerTrackMCMatch'),
+    standAloneMCMatch = cms.InputTag('outerTrackMCMatch'),
+    globalMCMatch = cms.InputTag('globalTrackMCMatch'),
     MuonSimInfoConfiguration = cms.VPSet(
         cms.PSet(
             muonSimInfo = cms.InputTag("muonSimClassifier"),
