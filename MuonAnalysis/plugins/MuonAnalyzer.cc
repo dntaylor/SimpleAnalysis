@@ -77,13 +77,17 @@ class MuonAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedResources> {
     "muon_outerTrack_t0", "muon_outerTrack_t0Error",
     "muon_outerTrack_gen_pt", "muon_outerTrack_gen_eta", "muon_outerTrack_gen_phi",
     "muon_outerTrack_gen_mass", "muon_outerTrack_gen_pdgId", "muon_outerTrack_gen_index",
+    "muon_globalTrack_pt", "muon_globalTrack_eta", "muon_globalTrack_phi",
+    "muon_globalTrack_t0", "muon_globalTrack_t0Error",
+    "muon_globalTrack_gen_pt", "muon_globalTrack_gen_eta", "muon_globalTrack_gen_phi",
+    "muon_globalTrack_gen_mass", "muon_globalTrack_gen_pdgId", "muon_globalTrack_gen_index",
     "muon_InTimeMuon",
     "muon_combinedQuality_chi2LocalMomentum",
     "muon_combinedQuality_localDistance",
     "muon_combinedQuality_globalDeltaEtaPhi",
     "muon_combinedQuality_chi2LocalPosition",
     "muon_combinedQuality_chi2Time",
-    "gen_pt", "gen_eta", "gen_phi", "gen_mass", "gen_pdgId",
+    "gen_pt", "gen_eta", "gen_phi", "gen_mass", "gen_charge", "gen_pdgId",
     "gen_isPromptFinalState",
     "gen_isPromptDecayed",
     "gen_isLastCopy",
@@ -253,7 +257,7 @@ void MuonAnalyzer::analyze(const edm::Event &iEvent, const edm::EventSetup &iSet
   unsigned int jdx = 0;
   std::map<unsigned int, unsigned int> genIdxToOutIdxMap;
   for (const auto gen: *genParticles) {
-    if (gen.status()!=1 || gen.pt()<5) {
+    if (gen.status()!=1 || gen.pt()<1) {
       idx++;
       continue;
     }
@@ -261,6 +265,7 @@ void MuonAnalyzer::analyze(const edm::Event &iEvent, const edm::EventSetup &iSet
     branches_["gen_eta"].push_back(gen.eta());
     branches_["gen_phi"].push_back(gen.phi());
     branches_["gen_mass"].push_back(gen.mass());
+    branches_["gen_charge"].push_back(gen.charge());
     branches_["gen_pdgId"].push_back(gen.pdgId());
     branches_["gen_isPromptFinalState"].push_back(gen.isPromptFinalState());
     branches_["gen_isPromptDecayed"].push_back(gen.isPromptDecayed());
@@ -285,7 +290,7 @@ void MuonAnalyzer::analyze(const edm::Event &iEvent, const edm::EventSetup &iSet
   for (const auto sta: *standAloneTracks) {
     sdx++;
 
-    if (sta.p()<5)
+    if (sta.p()<2)
       continue;
 
     staBranches_["standalone_pt"] = sta.pt();
@@ -295,8 +300,8 @@ void MuonAnalyzer::analyze(const edm::Event &iEvent, const edm::EventSetup &iSet
     staBranches_["standalone_t0"] = sta.t0();
     staBranches_["standalone_t0Error"] = sta.t0Error();
     
-    reco::TrackRef staRef(standAloneTracks, sdx);
     // gen match
+    reco::TrackRef staRef(standAloneTracks, sdx);
     reco::GenParticleRef gp = (*standAloneGenMatch)[staRef];
     if (gp.isNonnull()) {
       staBranches_["standalone_gen_pt"] = gp->pt();
@@ -319,7 +324,7 @@ void MuonAnalyzer::analyze(const edm::Event &iEvent, const edm::EventSetup &iSet
     for (const auto tk: *tracks) {
       tdx++;
 
-      if (reco::deltaR(sta, tk)>0.4 || tk.p()<2)
+      if (reco::deltaR(sta, tk)>0.4 || tk.p()<1)
         continue;
 
       staTkBranches_["standalone_track_pt"].push_back(tk.pt());
@@ -365,8 +370,8 @@ void MuonAnalyzer::analyze(const edm::Event &iEvent, const edm::EventSetup &iSet
   idx = 0;
   for (const auto muon: *muons) {
 
-    //if (muon.pt()<5 || !(muon.isTrackerMuon() || muon.isStandAloneMuon() || muon.isGlobalMuon())) {
-    if (muon.pt()<5) {
+    //if (muon.p()<2 || !(muon.isTrackerMuon() || muon.isStandAloneMuon() || muon.isGlobalMuon())) {
+    if (muon.p()<2) {
       ++idx;
       continue;
     }
@@ -424,14 +429,28 @@ void MuonAnalyzer::analyze(const edm::Event &iEvent, const edm::EventSetup &iSet
       branches_["muon_innerTrack_phi"].push_back(muon.innerTrack()->phi());
       branches_["muon_innerTrack_t0"].push_back(muon.innerTrack()->t0());
       branches_["muon_innerTrack_t0Error"].push_back(muon.innerTrack()->t0Error());
-      reco::GenParticleRef gp = (*trackGenMatch)[muon.innerTrack()];
-      if (gp.isNonnull()) {
-        branches_["muon_innerTrack_gen_pt"].push_back(gp->pt());
-        branches_["muon_innerTrack_gen_eta"].push_back(gp->eta());
-        branches_["muon_innerTrack_gen_phi"].push_back(gp->phi());
-        branches_["muon_innerTrack_gen_mass"].push_back(gp->mass());
-        branches_["muon_innerTrack_gen_pdgId"].push_back(gp->pdgId());
-        branches_["muon_innerTrack_gen_index"].push_back(genIdxToOutIdxMap[gp.key()]);
+      if (trackGenMatch->contains(muon.innerTrack().id())) {
+        reco::GenParticleRef gp = (*trackGenMatch)[muon.innerTrack()];
+        if (gp.isNonnull()) {
+          branches_["muon_innerTrack_gen_pt"].push_back(gp->pt());
+          branches_["muon_innerTrack_gen_eta"].push_back(gp->eta());
+          branches_["muon_innerTrack_gen_phi"].push_back(gp->phi());
+          branches_["muon_innerTrack_gen_mass"].push_back(gp->mass());
+          branches_["muon_innerTrack_gen_pdgId"].push_back(gp->pdgId());
+          auto it = genIdxToOutIdxMap.find(gp.key());
+          if (it != genIdxToOutIdxMap.end()) {
+            branches_["muon_innerTrack_gen_index"].push_back(it->second);
+          } else {
+            branches_["muon_innerTrack_gen_index"].push_back(-1);
+          }
+        } else {
+          branches_["muon_innerTrack_gen_pt"].push_back(0);
+          branches_["muon_innerTrack_gen_eta"].push_back(0);
+          branches_["muon_innerTrack_gen_phi"].push_back(0);
+          branches_["muon_innerTrack_gen_mass"].push_back(0);
+          branches_["muon_innerTrack_gen_pdgId"].push_back(0);
+          branches_["muon_innerTrack_gen_index"].push_back(-1);
+        }
       } else {
         branches_["muon_innerTrack_gen_pt"].push_back(0);
         branches_["muon_innerTrack_gen_eta"].push_back(0);
@@ -461,14 +480,28 @@ void MuonAnalyzer::analyze(const edm::Event &iEvent, const edm::EventSetup &iSet
       branches_["muon_outerTrack_phi"].push_back(muon.outerTrack()->phi());
       branches_["muon_outerTrack_t0"].push_back(muon.outerTrack()->t0());
       branches_["muon_outerTrack_t0Error"].push_back(muon.outerTrack()->t0Error());
-      reco::GenParticleRef gp = (*standAloneGenMatch)[muon.outerTrack()];
-      if (gp.isNonnull()) {
-        branches_["muon_outerTrack_gen_pt"].push_back(gp->pt());
-        branches_["muon_outerTrack_gen_eta"].push_back(gp->eta());
-        branches_["muon_outerTrack_gen_phi"].push_back(gp->phi());
-        branches_["muon_outerTrack_gen_mass"].push_back(gp->mass());
-        branches_["muon_outerTrack_gen_pdgId"].push_back(gp->pdgId());
-        branches_["muon_outerTrack_gen_index"].push_back(genIdxToOutIdxMap[gp.key()]);
+      if (standAloneGenMatch->contains(muon.outerTrack().id())) {
+        reco::GenParticleRef gp = (*standAloneGenMatch)[muon.outerTrack()];
+        if (gp.isNonnull()) {
+          branches_["muon_outerTrack_gen_pt"].push_back(gp->pt());
+          branches_["muon_outerTrack_gen_eta"].push_back(gp->eta());
+          branches_["muon_outerTrack_gen_phi"].push_back(gp->phi());
+          branches_["muon_outerTrack_gen_mass"].push_back(gp->mass());
+          branches_["muon_outerTrack_gen_pdgId"].push_back(gp->pdgId());
+          auto it = genIdxToOutIdxMap.find(gp.key());
+          if (it != genIdxToOutIdxMap.end()) {
+            branches_["muon_outerTrack_gen_index"].push_back(it->second);
+          } else {
+            branches_["muon_outerTrack_gen_index"].push_back(-1);
+          }
+        } else {
+          branches_["muon_outerTrack_gen_pt"].push_back(0);
+          branches_["muon_outerTrack_gen_eta"].push_back(0);
+          branches_["muon_outerTrack_gen_phi"].push_back(0);
+          branches_["muon_outerTrack_gen_mass"].push_back(0);
+          branches_["muon_outerTrack_gen_pdgId"].push_back(0);
+          branches_["muon_outerTrack_gen_index"].push_back(-1);
+        }
       } else {
         branches_["muon_outerTrack_gen_pt"].push_back(0);
         branches_["muon_outerTrack_gen_eta"].push_back(0);
@@ -489,6 +522,57 @@ void MuonAnalyzer::analyze(const edm::Event &iEvent, const edm::EventSetup &iSet
       branches_["muon_outerTrack_gen_mass"].push_back(0);
       branches_["muon_outerTrack_gen_pdgId"].push_back(0);
       branches_["muon_outerTrack_gen_index"].push_back(-1);
+    }
+
+    // globalTrack
+    if (muon.globalTrack().isNonnull()) {
+      branches_["muon_globalTrack_pt"].push_back(muon.globalTrack()->pt());
+      branches_["muon_globalTrack_eta"].push_back(muon.globalTrack()->eta());
+      branches_["muon_globalTrack_phi"].push_back(muon.globalTrack()->phi());
+      branches_["muon_globalTrack_t0"].push_back(muon.globalTrack()->t0());
+      branches_["muon_globalTrack_t0Error"].push_back(muon.globalTrack()->t0Error());
+      if (globalGenMatch->contains(muon.globalTrack().id())) {
+        reco::GenParticleRef gp = (*globalGenMatch)[muon.globalTrack()];
+        if (gp.isNonnull()) {
+          branches_["muon_globalTrack_gen_pt"].push_back(gp->pt());
+          branches_["muon_globalTrack_gen_eta"].push_back(gp->eta());
+          branches_["muon_globalTrack_gen_phi"].push_back(gp->phi());
+          branches_["muon_globalTrack_gen_mass"].push_back(gp->mass());
+          branches_["muon_globalTrack_gen_pdgId"].push_back(gp->pdgId());
+          auto it = genIdxToOutIdxMap.find(gp.key());
+          if (it != genIdxToOutIdxMap.end()) {
+            branches_["muon_globalTrack_gen_index"].push_back(it->second);
+          } else {
+            branches_["muon_globalTrack_gen_index"].push_back(-1);
+          }
+        } else {
+          branches_["muon_globalTrack_gen_pt"].push_back(0);
+          branches_["muon_globalTrack_gen_eta"].push_back(0);
+          branches_["muon_globalTrack_gen_phi"].push_back(0);
+          branches_["muon_globalTrack_gen_mass"].push_back(0);
+          branches_["muon_globalTrack_gen_pdgId"].push_back(0);
+          branches_["muon_globalTrack_gen_index"].push_back(-1);
+        }
+      } else {
+        branches_["muon_globalTrack_gen_pt"].push_back(0);
+        branches_["muon_globalTrack_gen_eta"].push_back(0);
+        branches_["muon_globalTrack_gen_phi"].push_back(0);
+        branches_["muon_globalTrack_gen_mass"].push_back(0);
+        branches_["muon_globalTrack_gen_pdgId"].push_back(0);
+        branches_["muon_globalTrack_gen_index"].push_back(-1);
+      }
+    } else {
+      branches_["muon_globalTrack_pt"].push_back(0);
+      branches_["muon_globalTrack_eta"].push_back(0);
+      branches_["muon_globalTrack_phi"].push_back(0);
+      branches_["muon_globalTrack_t0"].push_back(0);
+      branches_["muon_globalTrack_t0Error"].push_back(0);
+      branches_["muon_globalTrack_gen_pt"].push_back(0);
+      branches_["muon_globalTrack_gen_eta"].push_back(0);
+      branches_["muon_globalTrack_gen_phi"].push_back(0);
+      branches_["muon_globalTrack_gen_mass"].push_back(0);
+      branches_["muon_globalTrack_gen_pdgId"].push_back(0);
+      branches_["muon_globalTrack_gen_index"].push_back(-1);
     }
 
     // selectors
@@ -512,7 +596,7 @@ void MuonAnalyzer::analyze(const edm::Event &iEvent, const edm::EventSetup &iSet
       //
       // manually find gen
       unsigned int gdx = 0;
-      unsigned int matched;
+      int matched = -1;
       bool match = false;
       for (const auto gen : *genParticles) {
 
@@ -523,7 +607,9 @@ void MuonAnalyzer::analyze(const edm::Event &iEvent, const edm::EventSetup &iSet
         match = (match && std::abs(msi.p4.mass()-gen.mass())<1e-3);
         match = (match && std::abs(msi.pdgId-gen.pdgId())<1e-3);
         if (match) {
-          matched = genIdxToOutIdxMap[gdx];
+          auto it = genIdxToOutIdxMap.find(gdx);
+          if (it != genIdxToOutIdxMap.end())
+            matched = it->second;
           break;
         }
 
