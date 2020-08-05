@@ -118,6 +118,8 @@ class MuonAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedResources> {
     "standalone_track_globalDeltaEtaPhi",
     "standalone_track_chi2LocalPosition",
     "standalone_track_chi2Time",
+    "standalone_track_dEta",
+    "standalone_track_dPhi",
     "standalone_track_genMatch",
     //"standalone_track_gen_pt",
     //"standalone_track_gen_eta",
@@ -284,7 +286,7 @@ void MuonAnalyzer::analyze(const edm::Event &iEvent, const edm::EventSetup &iSet
   // store standalone and tracks matches
   // in separate tree
   // keep, but redo it iterating through muon collection instead of tracks
-  double chi2, d, dist, Rpos, time_chi2;
+  double chi2, d, dist, Rpos, time_chi2, deta, dphi;
   unsigned int sdx = -1;
   unsigned int tdx;
   for (const auto sta: *standAloneTracks) {
@@ -342,11 +344,22 @@ void MuonAnalyzer::analyze(const edm::Event &iEvent, const edm::EventSetup &iSet
       Rpos = theGlbMatcher->match(staCand, tkCand, 2, 0);
       dist = theGlbMatcher->match(staCand, tkCand, 3, 0);
       time_chi2 = theGlbMatcher->match(staCand, tkCand, 4, 0);
+      std::pair<TrajectoryStateOnSurface, TrajectoryStateOnSurface> tsosPair;
+      tsosPair = theGlbMatcher->convertToTSOSMuHit(staCand, tkCand);
+      if (tsosPair.second.isValid() && tsosPair.first.isValid()) {
+        deta = fabs(tsosPair.second.globalPosition().eta() - tsosPair.first.globalPosition().eta());
+        dphi = fabs(reco::deltaPhi(tsosPair.second.globalPosition().barePhi(), tsosPair.first.globalPosition().barePhi()));
+      } else {
+        deta = 0;
+        dphi = 0;
+      }
       staTkBranches_["standalone_track_chi2LocalMomentum"].push_back(chi2);
       staTkBranches_["standalone_track_localDistance"].push_back(d);
       staTkBranches_["standalone_track_chi2LocalPosition"].push_back(dist);
       staTkBranches_["standalone_track_globalDeltaEtaPhi"].push_back(Rpos);
       staTkBranches_["standalone_track_chi2Time"].push_back(time_chi2);
+      staTkBranches_["standalone_track_dEta"].push_back(deta);
+      staTkBranches_["standalone_track_dPhi"].push_back(dphi);
 
       // gen match
       reco::GenParticleRef gpt = (*trackGenMatch)[tkRef];
